@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Phòng Thí Nghiệm Vật Lí Ảo Thực Tế</title>
+    <style>
+        body { background: #222; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; }
+        .container { margin: 30px auto; max-width: 700px; background: #333; border-radius: 12px; padding: 24px; }
+        canvas { background: #444; border-radius: 10px; margin-bottom: 20px; }
+        .controls { margin-bottom: 20px; }
+        label { margin: 0 10px; }
+        select, input[type="number"], input[type="range"] { padding: 4px; border-radius: 4px; border: none; }
+        button { padding: 6px 16px; border-radius: 6px; border: none; background: #ffb300; color: #222; font-weight: bold; cursor: pointer; }
+        button:hover { background: #ffd54f; }
+        .formula { margin: 10px 0; font-size: 1.1em; color: #ffd54f; }
+        .slider-label { display: inline-block; width: 120px; text-align: right; margin-right: 8px; }
+    </style>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <h1>Phòng Thí Nghiệm Vật Lí Ảo Thực Tế</h1>
+    <div class="container">
+        <div class="controls">
+            <label>Chọn thí nghiệm:
+                <select id="experiment" onchange="changeExperiment()">
+                    <option value="pendulum">Con lắc đơn</option>
+                    <option value="spring">Lò xo</option>
+                    <option value="projectile">Chuyển động ném ngang</option>
+                    <option value="ideal_gas">Khí lý tưởng</option>
+                    <option value="thermo">Nhiệt động lực học</option>
+                    <option value="spring_horizontal">Con lắc lò xo ngang</option>
+                    <option value="inclined_plane">Mặt phẳng nghiêng</option>
+                </select>
+            </label>
+            <span id="params"></span>
+            <button onclick="resetExperiment()">Khởi động lại</button>
+            <button onclick="togglePause()" id="pauseBtn">Tạm dừng</button>
+            <button onclick="speedUp()">Tua nhanh</button>
+            <button onclick="speedDown()">Tua chậm</button>
+            <button onclick="toggleHeating()" id="heatBtn">Bật lửa</button>
+        </div>
+        <div class="formula" id="formula"></div>
+        <canvas id="canvas" width="600" height="400"></canvas>
+        <div id="info" style="margin-top:16px; font-size:1.1em;"></div>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let experiment = 'pendulum';
+        let isPaused = false;
+        let speed = 1;
+
+        // --- Con lắc đơn ---
+        let pendulum = {
+            length: 1, // mét
+            angle: Math.PI / 6, // rad
+            aVel: 0,
+            aAcc: 0,
+            gravity: 9.81, // m/s^2
+            origin: { x: 300, y: 60 },
+            mass: 0.2 // kg
+        };
+
+        // --- Lò xo ---
+        let spring = {
+            k: 20, // N/m
+            mass: 0.5, // kg
+            x: 200, // px
+            v: 0,
+            a: 0,
+            rest: 200, // px
+            length: 1, // mét
+            amplitude: 0.2 // mét
+        };
+
+        // --- Ném ngang ---
+        let projectile = {
+            x: 60,
+            y: 60,
+            vx: 10, // m/s
+            vy: 0,
+            g: 9.81, // m/s^2
+            radius: 15,
+            ground: 380,
+            t: 0,
+            h0: 60,
+            mass: 0.1 // kg
+        };
+
+        // --- Khí lý tưởng ---
+        let idealGas = {
+            P: 1, // atm
+            V: 22.4, // lít
+            n: 1, // mol
+            T: 273, // K
+            R: 0.082, // atm.l/mol.K
+            box: { x: 180, y: 100, w: 240, h: 160 },
+            molecules: []
+        };
+
+        // --- Nhiệt động lực học ---
+        let thermo = {
+            Q: 10000, // J
+            m: 1, // kg
+            c: 4200, // J/kg.K
+            T0: 25, // °C
+            T: 25 // °C
+        };
+
+        // --- Con lắc lò xo ngang ---
+        let spring_horizontal = {
+            k: 20, // N/m
+            mass: 0.5, // kg
+            amplitude: 0.2, // m
+            x0: 100, // px
+            t: 0
+        };
+
+        // --- Mặt phẳng nghiêng ---
+        let inclined_plane = {
+            angle: 30, // độ
+            mass: 1, // kg
+            g: 9.81, // m/s^2
+            x: 100, // px
+            y: 300, // px
+            v: 0,
+            t: 0
+        };
+
+        // --- Khởi tạo phân tử khí ---
+        function initMolecules() {
+            idealGas.molecules = [];
+            let count = Math.min(Math.round(idealGas.n * idealGas.T / 50), 40);
+            for (let i = 0; i < count; i++) {
+                idealGas.molecules.push({
+                    x: idealGas.box.x + 20 + Math.random() * (idealGas.box.w - 40),
+                    y: idealGas.box.y + 20 + Math.random() * (idealGas.box.h - 40),
+                    vx: (idealGas.T > 0 ? (Math.random() - 0.5) * Math.sqrt(idealGas.T) * 0.5 : 0),
+                    vy: (idealGas.T > 0 ? (Math.random() - 0.5) * Math.sqrt(idealGas.T) * 0.5 : 0)
+                });
+            }
+        }
+
+        // --- Vẽ con lắc đơn ---
+        function drawPendulum() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let pxLength = pendulum.length * 150; // chuyển mét sang px
+            let x = pendulum.origin.x + pxLength * Math.sin(pendulum.angle);
+            let y = pendulum.origin.y + pxLength * Math.cos(pendulum.angle);
+
+            // Dây
+            ctx.beginPath();
+            ctx.moveTo(pendulum.origin.x, pendulum.origin.y);
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Quả cầu
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ffb300";
+            ctx.shadowColor = "#ffb300";
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Gốc treo
+            ctx.beginPath();
+            ctx.arc(pendulum.origin.x, pendulum.origin.y, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+        }
+
+        function updatePendulum() {
+            // Phương trình thực tế: θ'' + (g/l)sinθ = 0
+            pendulum.aAcc = (-pendulum.gravity / pendulum.length) * Math.sin(pendulum.angle);
+            pendulum.aVel += pendulum.aAcc * 0.02 * speed;
+            pendulum.angle += pendulum.aVel * 0.02 * speed;
+            pendulum.aVel *= 0.999; // giảm chấn nhẹ
+        }
+
+        // --- Vẽ lò xo ---
+        function drawSpring() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let pxLength = spring.length * 150;
+            let y = 100 + pxLength + spring.amplitude * Math.sin(performance.now() / 500) * 150;
+
+            // Lò xo
+            ctx.beginPath();
+            ctx.moveTo(300, 100);
+            ctx.lineTo(300, y);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            // Vật nặng
+            ctx.beginPath();
+            ctx.rect(270, y, 60, 30);
+            ctx.fillStyle = "#ffb300";
+            ctx.shadowColor = "#ffb300";
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Gốc treo
+            ctx.beginPath();
+            ctx.arc(300, 100, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+        }
+
+        function updateSpring() {
+            // Dao động điều hòa: x = A cos(ωt)
+            let omega = Math.sqrt(spring.k / spring.mass);
+            spring.amplitude = Math.max(0.05, Math.abs(spring.amplitude));
+            // Vị trí được vẽ bằng hàm sin theo thời gian thực
+        }
+
+        // --- Vẽ con lắc lò xo ngang ---
+        function drawSpringHorizontal() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let omega = Math.sqrt(spring_horizontal.k / spring_horizontal.mass);
+            let x = spring_horizontal.x0 + spring_horizontal.amplitude * Math.cos(omega * spring_horizontal.t) * 150;
+            // Lò xo
+            ctx.beginPath();
+            ctx.moveTo(100, 200);
+            ctx.lineTo(x, 200);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 6;
+            ctx.stroke();
+            // Vật nặng
+            ctx.beginPath();
+            ctx.rect(x, 180, 40, 40);
+            ctx.fillStyle = "#ffb300";
+            ctx.fill();
+        }
+
+        function updateSpringHorizontal() {
+            spring_horizontal.t += 0.02 * speed;
+        }
+
+        // --- Vẽ ném ngang ---
+        function drawProjectile() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Đất
+            ctx.beginPath();
+            ctx.moveTo(0, projectile.ground);
+            ctx.lineTo(canvas.width, projectile.ground);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Quả cầu
+            ctx.beginPath();
+            ctx.arc(projectile.x, projectile.y, projectile.radius, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ffb300";
+            ctx.shadowColor = "#ffb300";
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function updateProjectile() {
+            // 1m = 40px, ground = 400px
+            if (projectile.y + projectile.radius < projectile.ground) {
+                projectile.t += 0.02 * speed;
+                projectile.x = 60 + projectile.vx * projectile.t * 40; // vx (m/s) * t (s) * 40px/m
+                projectile.y = 400 - (projectile.h0 * 40 + 0.5 * projectile.g * Math.pow(projectile.t, 2) * 40);
+            }
+        }
+
+        // --- Khí lý tưởng ---
+        let pistonPos = idealGas.box.y + idealGas.box.h - idealGas.V * 4;
+        let isDraggingPiston = false;
+
+        canvas.addEventListener('mousedown', function(e) {
+            if (experiment === 'ideal_gas') {
+                let rect = canvas.getBoundingClientRect();
+                let mouseY = e.clientY - rect.top;
+                if (mouseY > pistonPos && mouseY < pistonPos + 16) {
+                    isDraggingPiston = true;
+                }
+            }
+        });
+        canvas.addEventListener('mouseup', function() {
+            isDraggingPiston = false;
+        });
+        canvas.addEventListener('mousemove', function(e) {
+            if (experiment === 'ideal_gas' && isDraggingPiston) {
+                let rect = canvas.getBoundingClientRect();
+                let mouseY = e.clientY - rect.top;
+                let newV = (idealGas.box.y + idealGas.box.h - mouseY) / 4;
+                if (newV > 2 && newV < 60) {
+                    idealGas.V = newV;
+                    // Tính lại áp suất theo PV = nRT
+                    idealGas.P = (idealGas.n * idealGas.R * idealGas.T) / idealGas.V;
+                }
+            }
+        });
+
+        function drawIdealGas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Vẽ hộp khí
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(idealGas.box.x, idealGas.box.y, idealGas.box.w, idealGas.box.h);
+
+            // Vẽ piston
+            let pistonPos = idealGas.box.y + idealGas.box.h - idealGas.V * 4;
+            ctx.fillStyle = "#ffd54f";
+            ctx.fillRect(idealGas.box.x, pistonPos, idealGas.box.w, 16);
+
+            // Phân tử khí chuyển động và va chạm piston
+            if (idealGas.T > 0) {
+                for (let mol of idealGas.molecules) {
+                    mol.x += mol.vx * 0.5 * speed;
+                    mol.y += mol.vy * 0.5 * speed;
+                    // Va chạm thành hộp và piston
+                    if (mol.x < idealGas.box.x + 10 || mol.x > idealGas.box.x + idealGas.box.w - 10) mol.vx *= -1;
+                    if (mol.y < idealGas.box.y + 10 || mol.y > pistonPos - 10) mol.vy *= -1;
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = "#ffb300";
+                    ctx.fill();
+                }
+            } else {
+                // Nhiệt độ tuyệt đối, phân tử đứng yên
+                for (let i = 0; i < Math.min(idealGas.n, 20); i++) {
+                    let px = idealGas.box.x + idealGas.box.w / 2;
+                    let py = pistonPos - 20;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = "#888";
+                    ctx.fill();
+                }
+            }
+        }
+
+        function updateIdealGas() {
+            // Phương trình khí lý tưởng: PV = nRT
+            idealGas.V = (idealGas.n * idealGas.R * idealGas.T) / idealGas.P;
+            // Cập nhật chuyển động phân tử
+            if (idealGas.T > 0) {
+                for (let mol of idealGas.molecules) {
+                    mol.x += mol.vx * 0.5 * speed;
+                    mol.y += mol.vy * 0.5 * speed;
+                    // Va chạm thành hộp
+                    if (mol.x < idealGas.box.x + 10 || mol.x > idealGas.box.x + idealGas.box.w - 10) mol.vx *= -1;
+                    if (mol.y < idealGas.box.y + 10 || mol.y > idealGas.box.y + idealGas.box.h - 10) mol.vy *= -1;
+                }
+            }
+        }
+
+        // --- Vẽ nhiệt động lực học ---
+        let heating = false;
+        let lastUpdate = Date.now();
+
+        function drawThermo() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Vẽ bình nước
+            ctx.beginPath();
+            ctx.arc(300, 200, 70, Math.PI, 2 * Math.PI);
+            ctx.lineTo(370, 300);
+            ctx.arc(300, 300, 70, 0, Math.PI);
+            ctx.closePath();
+            ctx.fillStyle = "#2196f3";
+            ctx.fill();
+
+            // Vẽ nhiệt kế
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(470, 120, 12, 120);
+            ctx.beginPath();
+            ctx.arc(476, 240, 16, 0, 2 * Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+
+            // Vẽ cột nhiệt độ
+            let tempH = Math.min((thermo.T - thermo.T0) * 2, 120);
+            ctx.fillStyle = "#ff4e50";
+            ctx.fillRect(472, 240 - tempH, 8, tempH);
+
+            // Vẽ lửa nếu đang đun
+            if (heating) {
+                ctx.beginPath();
+                ctx.arc(300, 320, 20, 0, Math.PI, true);
+                ctx.fillStyle = "#ffb300";
+                ctx.fill();
+            }
+            // Hiệu ứng sôi
+            if (thermo.T >= 100) {
+                for (let i = 0; i < 10; i++) {
+                    let bx = 260 + Math.random() * 80;
+                    let by = 260 + Math.random() * 30;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = "#fff";
+                    ctx.globalAlpha = 0.7;
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        function updateThermo() {
+            // Nếu đang đun thì tăng nhiệt lượng theo thời gian
+            if (heating) {
+                let now = Date.now();
+                let dt = (now - lastUpdate) / 1000;
+                lastUpdate = now;
+                thermo.Q += 500 * dt; // mỗi giây tăng 500J
+            }
+            // Q = m * c * ΔT => ΔT = Q / (m * c)
+            thermo.T = thermo.T0 + thermo.Q / (thermo.m * thermo.c);
+            if (thermo.T > 100) thermo.T = 100; // Giới hạn nhiệt độ sôi
+        }
+
+        // --- Vẽ mặt phẳng nghiêng ---
+        function drawInclinedPlane() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let rad = inclined_plane.angle * Math.PI / 180;
+            // Vẽ mặt phẳng nghiêng
+            ctx.beginPath();
+            ctx.moveTo(100, 350);
+            ctx.lineTo(500, 350 - Math.tan(rad) * 400);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            // Vật nặng
+            ctx.save();
+            ctx.translate(inclined_plane.x, inclined_plane.y);
+            ctx.rotate(-rad);
+            ctx.fillStyle = "#ffb300";
+            ctx.fillRect(-20, -20, 40, 40);
+            ctx.restore();
+        }
+
+        function updateInclinedPlane() {
+            let rad = inclined_plane.angle * Math.PI / 180;
+            let a = inclined_plane.g * Math.sin(rad);
+            inclined_plane.v += a * 0.02 * speed;
+            inclined_plane.x += inclined_plane.v * 0.02 * speed * 40;
+            inclined_plane.y = 350 - Math.tan(rad) * (inclined_plane.x - 100);
+            inclined_plane.t += 0.02 * speed;
+            if (inclined_plane.x > 500) {
+                inclined_plane.x = 500;
+                inclined_plane.v = 0;
+            }
+        }
+
+        // --- Hiển thị công thức ---
+        function showFormula() {
+            let html = '';
+            if (experiment === 'pendulum') {
+                html = '\\( \\theta(t) = \\theta_0 \\cos\\left(\\sqrt{\\frac{g}{l}} t\\right) \\) &nbsp; &nbsp; \\( T = 2\\pi \\sqrt{\\frac{l}{g}} \\)';
+            } else if (experiment === 'spring') {
+                html = '\\( x(t) = A \\cos(\\omega t) \\), &nbsp; \\( \\omega = \\sqrt{\\frac{k}{m}} \\)';
+            } else if (experiment === 'projectile') {
+                html = '\\( x = v_0 t \\), &nbsp; \\( y = h_0 + \\frac{1}{2}gt^2 \\)';
+            } else if (experiment === 'ideal_gas') {
+                html = '\\( PV = nRT \\)';
+            } else if (experiment === 'thermo') {
+                html = '\\( Q = m c \\Delta T \\)';
+            }
+            document.getElementById('formula').innerHTML = html;
+            if (window.MathJax) MathJax.typesetPromise();
+        }
+
+        // --- Hiển thị thông số ---
+        function showInfo() {
+            let html = '';
+            if (experiment === 'pendulum') {
+                // Tính động năng, thế năng, năng lượng toàn phần
+                let h = pendulum.length * (1 - Math.cos(pendulum.angle)); // Độ cao so với vị trí cân bằng
+                let PE = pendulum.mass * pendulum.gravity * h; // Thế năng
+                let v = pendulum.length * pendulum.aVel; // Vận tốc đầu vật
+                let KE = 0.5 * pendulum.mass * v * v; // Động năng
+                let E = KE + PE;
+                html = `
+                    <b>Con lắc đơn:</b><br>
+                    Thời gian: ${(performance.now()/1000).toFixed(2)} s<br>
+                    Góc hiện tại: ${(pendulum.angle * 180 / Math.PI).toFixed(2)}°<br>
+                    Độ dài: ${pendulum.length.toFixed(2)} m<br>
+                    Khối lượng: ${pendulum.mass} kg<br>
+                    Vận tốc góc: ${pendulum.aVel.toFixed(3)} rad/s<br>
+                    Gia tốc góc: ${pendulum.aAcc.toFixed(3)} rad/s²<br>
+                    Chu kỳ: ${(2 * Math.PI * Math.sqrt(pendulum.length / pendulum.gravity)).toFixed(2)} s<br>
+                    Động năng: ${KE.toFixed(2)} J<br>
+                    Thế năng: ${PE.toFixed(2)} J<br>
+                    Năng lượng toàn phần: ${E.toFixed(2)} J
+                `;
+            } else if (experiment === 'spring') {
+                let omega = Math.sqrt(spring.k / spring.mass);
+                let x = spring.amplitude * Math.sin(performance.now()/500);
+                let v = omega * spring.amplitude * Math.cos(performance.now()/500);
+                let KE = 0.5 * spring.mass * v * v;
+                let PE = 0.5 * spring.k * x * x;
+                let E = KE + PE;
+                html = `
+                    <b>Lò xo:</b><br>
+                    Thời gian: ${(performance.now()/1000).toFixed(2)} s<br>
+                    Độ cứng k: ${spring.k} N/m<br>
+                    Khối lượng: ${spring.mass} kg<br>
+                    Biên độ: ${spring.amplitude.toFixed(2)} m<br>
+                    Tần số góc: ${omega.toFixed(2)} rad/s<br>
+                    Vị trí x: ${x.toFixed(2)} m<br>
+                    Vận tốc: ${v.toFixed(2)} m/s<br>
+                    Động năng: ${KE.toFixed(2)} J<br>
+                    Thế năng: ${PE.toFixed(2)} J<br>
+                    Năng lượng toàn phần: ${E.toFixed(2)} J
+                `;
+            } else if (experiment === 'projectile') {
+                let t = projectile.t * 15;
+                let y = projectile.h0 + projectile.vy * t + 0.5 * projectile.g * t * t;
+                let vy = projectile.vy + projectile.g * t;
+                let KE = 0.5 * projectile.mass * (projectile.vx * projectile.vx + vy * vy);
+                let PE = projectile.mass * projectile.g * y;
+                html = `
+                    <b>Ném ngang:</b><br>
+                    Thời gian bay: ${t.toFixed(2)} s<br>
+                    Vị trí X: ${projectile.x.toFixed(2)} px<br>
+                    Vị trí Y: ${projectile.y.toFixed(2)} px<br>
+                    Vận tốc ngang: ${projectile.vx.toFixed(2)} m/s<br>
+                    Vận tốc dọc: ${vy.toFixed(2)} m/s<br>
+                    Khối lượng: ${projectile.mass} kg<br>
+                    Động năng: ${KE.toFixed(2)} J<br>
+                    Thế năng: ${PE.toFixed(2)} J
+                `;
+            } else if (experiment === 'ideal_gas') {
+                // Tính số phân tử, vận tốc trung bình, áp suất, thể tích, nhiệt độ
+                let N = idealGas.molecules.length;
+                let v_avg = idealGas.T > 0 ? Math.sqrt(3 * 8.314 * idealGas.T / (0.028)) : 0; // mol khí N2
+                html = `
+                    <b>Khí lý tưởng:</b><br>
+                    Thời gian: ${(performance.now()/1000).toFixed(2)} s<br>
+                    Áp suất (P): ${idealGas.P.toFixed(2)} atm<br>
+                    Thể tích (V): ${idealGas.V.toFixed(2)} lít<br>
+                    Số mol (n): ${idealGas.n}<br>
+                    Nhiệt độ (T): ${idealGas.T} K<br>
+                    Số phân tử: ${N}<br>
+                    Vận tốc trung bình phân tử: ${v_avg.toFixed(2)} m/s
+                `;
+            } else if (experiment === 'thermo') {
+                let dt = thermo.T - thermo.T0;
+                let Q = thermo.Q;
+                html = `
+                    <b>Nhiệt động lực học:</b><br>
+                    Thời gian: ${(performance.now()/1000).toFixed(2)} s<br>
+                    Nhiệt lượng (Q): ${Q.toFixed(2)} J<br>
+                    Khối lượng (m): ${thermo.m} kg<br>
+                    Nhiệt dung riêng (c): ${thermo.c} J/kg.K<br>
+                    Nhiệt độ ban đầu (T₀): ${thermo.T0} °C<br>
+                    Nhiệt độ hiện tại (T): ${thermo.T.toFixed(2)} °C<br>
+                    Độ tăng nhiệt: ${dt.toFixed(2)} °C
+                `;
+            } else if (experiment === 'spring_horizontal') {
+                let omega = Math.sqrt(spring_horizontal.k / spring_horizontal.mass);
+                let x = spring_horizontal.amplitude * Math.cos(omega * spring_horizontal.t);
+                let v = -omega * spring_horizontal.amplitude * Math.sin(omega * spring_horizontal.t);
+                let KE = 0.5 * spring_horizontal.mass * v * v;
+                let PE = 0.5 * spring_horizontal.k * x * x;
+                let E = KE + PE;
+                html = `
+                    <b>Con lắc lò xo ngang:</b><br>
+                    Thời gian: ${(spring_horizontal.t).toFixed(2)} s<br>
+                    Độ cứng k: ${spring_horizontal.k} N/m<br>
+                    Khối lượng: ${spring_horizontal.mass} kg<br>
+                    Biên độ: ${spring_horizontal.amplitude.toFixed(2)} m<br>
+                    Vị trí x: ${x.toFixed(2)} m<br>
+                    Vận tốc: ${v.toFixed(2)} m/s<br>
+                    Động năng: ${KE.toFixed(2)} J<br>
+                    Thế năng: ${PE.toFixed(2)} J<br>
+                    Năng lượng toàn phần: ${E.toFixed(2)} J
+                `;
+            } else if (experiment === 'inclined_plane') {
+                let rad = inclined_plane.angle * Math.PI / 180;
+                let a = inclined_plane.g * Math.sin(rad);
+                html = `
+                    <b>Mặt phẳng nghiêng:</b><br>
+                    Thời gian: ${(inclined_plane.t).toFixed(2)} s<br>
+                    Góc nghiêng: ${inclined_plane.angle}°<br>
+                    Khối lượng: ${inclined_plane.mass} kg<br>
+                    Gia tốc: ${a.toFixed(2)} m/s²<br>
+                    Vận tốc: ${inclined_plane.v.toFixed(2)} m/s<br>
+                    Vị trí x: ${inclined_plane.x.toFixed(2)} px
+                `;
+            }
+            document.getElementById('info').innerHTML = html;
+        }
+
+        // --- Hiển thị điều chỉnh thông số ---
+        function showParams() {
+            let html = '';
+            if (experiment === 'pendulum') {
+                html = `
+                    <span class="slider-label">Góc ban đầu (°):</span>
+                    <input type="range" id="angle" min="5" max="80" value="30" oninput="document.getElementById('angle_val').innerText=this.value">
+                    <span id="angle_val">30</span>
+                    <span class="slider-label">Độ dài (m):</span>
+                    <input type="range" id="length" min="0.2" max="2" step="0.01" value="1" oninput="document.getElementById('length_val').innerText=this.value">
+                    <span id="length_val">1</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="mass" min="0.05" max="2" step="0.01" value="0.2" oninput="document.getElementById('mass_val').innerText=this.value">
+                    <span id="mass_val">0.2</span>
+                `;
+            } else if (experiment === 'spring') {
+                html = `
+                    <span class="slider-label">Độ cứng k (N/m):</span>
+                    <input type="range" id="k" min="5" max="50" step="1" value="20" oninput="document.getElementById('k_val').innerText=this.value">
+                    <span id="k_val">20</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="mass" min="0.1" max="2" step="0.01" value="0.5" oninput="document.getElementById('mass_val').innerText=this.value">
+                    <span id="mass_val">0.5</span>
+                    <span class="slider-label">Biên độ (m):</span>
+                    <input type="range" id="amplitude" min="0.05" max="0.5" step="0.01" value="0.2" oninput="document.getElementById('amplitude_val').innerText=this.value">
+                    <span id="amplitude_val">0.2</span>
+                `;
+            } else if (experiment === 'projectile') {
+                html = `
+                    <span class="slider-label">Vận tốc ném ngang (m/s):</span>
+                    <input type="range" id="vx" min="2" max="20" step="0.1" value="10" oninput="document.getElementById('vx_val').innerText=this.value">
+                    <span id="vx_val">10</span>
+                    <span class="slider-label">Độ cao ban đầu (m):</span>
+                    <input type="range" id="y" min="1" max="10" step="0.1" value="4" oninput="document.getElementById('y_val').innerText=this.value">
+                    <span id="y_val">4</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="mass" min="0.05" max="1" step="0.01" value="0.1" oninput="document.getElementById('mass_val').innerText=this.value">
+                    <span id="mass_val">0.1</span>
+                `;
+            } else if (experiment === 'ideal_gas') {
+                html = `
+                    <span class="slider-label">Áp suất (Pa):</span>
+                    <input type="range" id="P" min="10000" max="200000" step="1000" value="101325" oninput="document.getElementById('P_val').innerText=this.value">
+                    <span id="P_val">101325</span>
+                    <span class="slider-label">Số mol (mol):</span>
+                    <input type="range" id="n" min="0.5" max="5" step="0.1" value="1" oninput="document.getElementById('n_val').innerText=this.value">
+                    <span id="n_val">1</span>
+                    <span class="slider-label">Nhiệt độ (K):</span>
+                    <input type="range" id="T" min="0" max="600" step="1" value="273" oninput="document.getElementById('T_val').innerText=this.value">
+                    <span id="T_val">273</span>
+                `;
+            } else if (experiment === 'thermo') {
+                html = `
+                    <span class="slider-label">Nhiệt lượng (J):</span>
+                    <input type="range" id="Q" min="0" max="50000" step="100" value="10000" oninput="document.getElementById('Q_val').innerText=this.value">
+                    <span id="Q_val">10000</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="m" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('m_val').innerText=this.value">
+                    <span id="m_val">1</span>
+                    <span class="slider-label">Nhiệt dung riêng (J/kg.K):</span>
+                    <input type="range" id="c" min="1000" max="5000" step="10" value="4200" oninput="document.getElementById('c_val').innerText=this.value">
+                    <span id="c_val">4200</span>
+                    <span class="slider-label">Nhiệt độ ban đầu (°C):</span>
+                    <input type="range" id="T0" min="0" max="100" step="1" value="25" oninput="document.getElementById('T0_val').innerText=this.value">
+                    <span id="T0_val">25</span>
+                `;
+            } else if (experiment === 'spring_horizontal') {
+                html = `
+                    <span class="slider-label">Độ cứng k (N/m):</span>
+                    <input type="range" id="k" min="5" max="50" step="1" value="20" oninput="document.getElementById('k_val').innerText=this.value">
+                    <span id="k_val">20</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="mass" min="0.1" max="2" step="0.01" value="0.5" oninput="document.getElementById('mass_val').innerText=this.value">
+                    <span id="mass_val">0.5</span>
+                    <span class="slider-label">Biên độ (m):</span>
+                    <input type="range" id="amplitude" min="0.05" max="0.5" step="0.01" value="0.2" oninput="document.getElementById('amplitude_val').innerText=this.value">
+                    <span id="amplitude_val">0.2</span>
+                `;
+            } else if (experiment === 'inclined_plane') {
+                html = `
+                    <span class="slider-label">Góc nghiêng (°):</span>
+                    <input type="range" id="angle" min="5" max="60" value="30" oninput="document.getElementById('angle_val').innerText=this.value">
+                    <span id="angle_val">30</span>
+                    <span class="slider-label">Khối lượng (kg):</span>
+                    <input type="range" id="mass" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('mass_val').innerText=this.value">
+                    <span id="mass_val">1</span>
+                `;
+            }
+            document.getElementById('params').innerHTML = html;
+        }
+
+        // --- Điều chỉnh lại các hàm reset để lấy đúng đơn vị ---
+        function resetExperiment() {
+            if (experiment === 'pendulum') {
+                pendulum.angle = (parseFloat(document.getElementById('angle').value) || 30) * Math.PI / 180;
+                pendulum.length = parseFloat(document.getElementById('length').value) || 1;
+                pendulum.mass = parseFloat(document.getElementById('mass').value) || 0.2;
+                pendulum.aVel = 0;
+            } else if (experiment === 'spring') {
+                spring.k = parseFloat(document.getElementById('k').value) || 20;
+                spring.mass = parseFloat(document.getElementById('mass').value) || 0.5;
+                spring.amplitude = parseFloat(document.getElementById('amplitude').value) || 0.2;
+                spring.length = 1;
+            } else if (experiment === 'projectile') {
+                projectile.vx = parseFloat(document.getElementById('vx').value) || 10;
+                projectile.h0 = parseFloat(document.getElementById('y').value) || 4;
+                projectile.mass = parseFloat(document.getElementById('mass').value) || 0.1;
+                projectile.vy = 0;
+                projectile.t = 0;
+                // Chuyển đổi từ mét sang pixel (1m = 40px)
+                projectile.x = 60;
+                projectile.y = 400 - projectile.h0 * 40;
+                projectile.ground = 400;
+            } else if (experiment === 'ideal_gas') {
+                idealGas.P = parseFloat(document.getElementById('P').value) || 101325;
+                idealGas.n = parseFloat(document.getElementById('n').value) || 1;
+                idealGas.T = parseFloat(document.getElementById('T').value) || 273;
+                idealGas.R = 8.314; // J/(mol.K)
+                idealGas.V = (idealGas.n * idealGas.R * idealGas.T) / idealGas.P;
+                initMolecules();
+            } else if (experiment === 'thermo') {
+                thermo.Q = parseFloat(document.getElementById('Q').value) || 10000;
+                thermo.m = parseFloat(document.getElementById('m').value) || 1;
+                thermo.c = parseFloat(document.getElementById('c').value) || 4200;
+                thermo.T0 = parseFloat(document.getElementById('T0').value) || 25;
+            } else if (experiment === 'spring_horizontal') {
+                spring_horizontal.k = parseFloat(document.getElementById('k').value) || 20;
+                spring_horizontal.mass = parseFloat(document.getElementById('mass').value) || 0.5;
+                spring_horizontal.amplitude = parseFloat(document.getElementById('amplitude').value) || 0.2;
+                spring_horizontal.t = 0;
+            } else if (experiment === 'inclined_plane') {
+                inclined_plane.angle = parseFloat(document.getElementById('angle').value) || 30;
+                inclined_plane.mass = parseFloat(document.getElementById('mass').value) || 1;
+                inclined_plane.x = 100;
+                inclined_plane.y = 300;
+                inclined_plane.v = 0;
+                inclined_plane.t = 0;
+            }
+        }
+
+        function changeExperiment() {
+            experiment = document.getElementById('experiment').value;
+            showParams();
+            resetExperiment();
+            showFormula();
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').innerText = isPaused ? 'Tiếp tục' : 'Tạm dừng';
+        }
+
+        function speedUp() {
+            speed *= 2;
+            if (speed > 8) speed = 8;
+        }
+
+        function speedDown() {
+            speed /= 2;
+            if (speed < 0.125) speed = 0.125;
+        }
+
+        function toggleHeating() {
+            heating = !heating;
+            document.getElementById('heatBtn').innerText = heating ? 'Tắt lửa' : 'Bật lửa';
+            lastUpdate = Date.now();
+        }
+
+        function animate() {
+            if (!isPaused) {
+                for (let i = 0; i < speed; i++) {
+                    if (experiment === 'pendulum') updatePendulum();
+                    else if (experiment === 'spring') updateSpring();
+                    else if (experiment === 'projectile') updateProjectile();
+                    else if (experiment === 'ideal_gas') updateIdealGas();
+                    else if (experiment === 'thermo') updateThermo();
+                    else if (experiment === 'spring_horizontal') updateSpringHorizontal();
+                    else if (experiment === 'inclined_plane') updateInclinedPlane();
+                }
+            }
+            if (experiment === 'pendulum') drawPendulum();
+            else if (experiment === 'spring') drawSpring();
+            else if (experiment === 'projectile') drawProjectile();
+            else if (experiment === 'ideal_gas') drawIdealGas();
+            else if (experiment === 'thermo') drawThermo();
+            else if (experiment === 'spring_horizontal') drawSpringHorizontal();
+            else if (experiment === 'inclined_plane') drawInclinedPlane();
+            showInfo();
+            requestAnimationFrame(animate);
+        }
+
+        showParams();
+        resetExperiment();
+        showFormula(); // Thêm dòng này để hiển thị công thức
+        animate();
+    </script>
+</body>
+</html>
