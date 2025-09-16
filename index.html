@@ -243,7 +243,7 @@
             spring_horizontal.t += 0.02 * speed;
         }
 
-        // --- Vẽ ném ngang ---
+        // --- ném ngang ---
         function drawProjectile() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -683,7 +683,7 @@
             document.getElementById('params').innerHTML = html;
         }
 
-        // --- Điều chỉnh lại các hàm reset để lấy đúng đơn vị ---
+        // Điều chỉnh lại các hàm reset, lấy đúng đơn vị 
         function resetExperiment() {
             if (experiment === 'pendulum') {
                 pendulum.angle = (parseFloat(document.getElementById('angle').value) || 30) * Math.PI / 180;
@@ -785,11 +785,12 @@
 
         showParams();
         resetExperiment();
-        showFormula(); // Thêm dòng này để hiển thị công thức
+        showFormula(); // hiển thị công thức
         animate();
     </script>
 </body>
 </html>
 
 Do là bản beta nên một số tính năng có thể chưa hoàn thiện. Mong nhận được phản hồi từ người dùng để cải thiện sản phẩm.
+
 
