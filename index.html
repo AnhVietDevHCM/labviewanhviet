@@ -197,6 +197,7 @@
             k: 20, // N/m
             mass: 0.5, // kg
             amplitude: 0.2, // mét
+            damping: 0.2, // Hệ số cản
             t: 0 // thời gian mô phỏng
         };
 
@@ -250,6 +251,7 @@
             k: 20, // N/m
             mass: 0.5, // kg
             amplitude: 0.2, // m
+            damping: 0.2, // Hệ số cản
             x0: 350, // px
             t: 0 // thời gian mô phỏng
         };
@@ -314,7 +316,9 @@
         function drawSpring() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             let omega = Math.sqrt(spring.k / spring.mass);
-            let y = 200 + spring.amplitude * Math.cos(omega * spring.t) * 300;
+            // Thêm hệ số tắt dần vào biên độ
+            let current_amplitude = spring.amplitude * Math.exp(-(spring.damping / (2 * spring.mass)) * spring.t);
+            let y = 200 + current_amplitude * Math.cos(omega * spring.t) * 300;
             ctx.beginPath();
             ctx.moveTo(350, 50);
             ctx.lineTo(350, y - 20);
@@ -342,7 +346,9 @@
         function drawSpringHorizontal() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             let omega = Math.sqrt(spring_horizontal.k / spring_horizontal.mass);
-            let x = spring_horizontal.x0 + spring_horizontal.amplitude * Math.cos(omega * spring_horizontal.t) * 300;
+            // Thêm hệ số tắt dần vào biên độ
+            let current_amplitude = spring_horizontal.amplitude * Math.exp(-(spring_horizontal.damping / (2 * spring_horizontal.mass)) * spring_horizontal.t);
+            let x = spring_horizontal.x0 + current_amplitude * Math.cos(omega * spring_horizontal.t) * 300;
             ctx.beginPath();
             ctx.moveTo(150, 225);
             ctx.lineTo(x, 225);
@@ -688,14 +694,17 @@
                 `;
             } else if (experiment === 'spring') {
                 let omega = Math.sqrt(spring.k / spring.mass);
-                let x = spring.amplitude * Math.cos(omega * spring.t);
-                let v = -omega * spring.amplitude * Math.sin(omega * spring.t);
-                let KE = 0.5 * spring.mass * v * v;
+                // Tính toán với biên độ tắt dần để khớp với đồ thị và mô phỏng
+                let current_amplitude = spring.amplitude * Math.exp(-(spring.damping / (2 * spring.mass)) * spring.t);
+                let x = current_amplitude * Math.cos(omega * spring.t);
+                // Vận tốc cũng phải được tính từ đạo hàm của li độ tắt dần
+                let v = -Math.exp(-(spring.damping / (2 * spring.mass)) * spring.t) * ( (spring.damping / (2 * spring.mass)) * spring.amplitude * Math.cos(omega * spring.t) + omega * spring.amplitude * Math.sin(omega * spring.t) );
+                let KE = 0.5 * spring.mass * v * v; 
                 let PE = 0.5 * spring.k * x * x;
                 let E = KE + PE;
                 html = `
                     <b>Lò xo:</b><br>
-                    Thời gian: ${(performance.now()/1000).toFixed(2)} s<br>
+                    Thời gian: ${spring.t.toFixed(2)} s<br>
                     Độ cứng k: ${spring.k} N/m<br>
                     Khối lượng: ${spring.mass} kg<br>
                     Biên độ: ${spring.amplitude.toFixed(2)} m<br>
@@ -755,9 +764,12 @@
                 `;
             } else if (experiment === 'spring_horizontal') {
                 let omega = Math.sqrt(spring_horizontal.k / spring_horizontal.mass);
-                let x = spring_horizontal.amplitude * Math.cos(omega * spring_horizontal.t);
-                let v = -omega * spring_horizontal.amplitude * Math.sin(omega * spring_horizontal.t);
-                let KE = 0.5 * spring_horizontal.mass * v * v;
+                // Tính toán với biên độ tắt dần để khớp với đồ thị và mô phỏng
+                let current_amplitude = spring_horizontal.amplitude * Math.exp(-(spring_horizontal.damping / (2 * spring_horizontal.mass)) * spring_horizontal.t);
+                let x = current_amplitude * Math.cos(omega * spring_horizontal.t);
+                // Vận tốc cũng phải được tính từ đạo hàm của li độ tắt dần
+                let v = -Math.exp(-(spring_horizontal.damping / (2 * spring_horizontal.mass)) * spring_horizontal.t) * ( (spring_horizontal.damping / (2 * spring_horizontal.mass)) * spring_horizontal.amplitude * Math.cos(omega * spring_horizontal.t) + omega * spring_horizontal.amplitude * Math.sin(omega * spring_horizontal.t) );
+                let KE = 0.5 * spring_horizontal.mass * v * v; 
                 let PE = 0.5 * spring_horizontal.k * x * x;
                 let E = KE + PE;
                 html = `
@@ -813,6 +825,7 @@
                     <div class="param-item"><span class="slider-label">Độ cứng k (N/m):</span><input type="range" id="k" min="5" max="50" step="1" value="20" oninput="document.getElementById('k_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="k_val">20</span></div>
                     <div class="param-item"><span class="slider-label">Khối lượng (kg):</span><input type="range" id="mass" min="0.1" max="2" step="0.01" value="0.5" oninput="document.getElementById('mass_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="mass_val">0.5</span></div>
                     <div class="param-item"><span class="slider-label">Biên độ (m):</span><input type="range" id="amplitude" min="0.05" max="0.5" step="0.01" value="0.2" oninput="document.getElementById('amplitude_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="amplitude_val">0.2</span></div>
+                    <div class="param-item"><span class="slider-label">Lực cản:</span><input type="range" id="damping" min="0" max="1" step="0.01" value="0.2" oninput="document.getElementById('damping_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="damping_val">0.2</span></div>
                 `;
             } else if (experiment === 'projectile') {
                 html = `
@@ -839,6 +852,7 @@
                     <div class="param-item"><span class="slider-label">Độ cứng k (N/m):</span><input type="range" id="k" min="5" max="50" step="1" value="20" oninput="document.getElementById('k_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="k_val">20</span></div>
                     <div class="param-item"><span class="slider-label">Khối lượng (kg):</span><input type="range" id="mass" min="0.1" max="2" step="0.01" value="0.5" oninput="document.getElementById('mass_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="mass_val">0.5</span></div>
                     <div class="param-item"><span class="slider-label">Biên độ (m):</span><input type="range" id="amplitude" min="0.05" max="0.5" step="0.01" value="0.2" oninput="document.getElementById('amplitude_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="amplitude_val">0.2</span></div>
+                    <div class="param-item"><span class="slider-label">Lực cản:</span><input type="range" id="damping" min="0" max="1" step="0.01" value="0.2" oninput="document.getElementById('damping_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="damping_val">0.2</span></div>
                 `;
             } else if (experiment === 'inclined_plane') {
                 html = `
@@ -862,6 +876,7 @@
                 spring.k = parseFloat(document.getElementById('k').value) || 20;
                 spring.mass = parseFloat(document.getElementById('mass').value) || 0.5;
                 spring.amplitude = parseFloat(document.getElementById('amplitude').value) || 0.2;
+                spring.damping = parseFloat(document.getElementById('damping').value) || 0.2;
                 spring.t = 0;
             } else if (experiment === 'projectile') {
                 projectile.vx = parseFloat(document.getElementById('vx').value) || 10;
@@ -892,6 +907,7 @@
                 spring_horizontal.k = parseFloat(document.getElementById('k').value) || 20;
                 spring_horizontal.mass = parseFloat(document.getElementById('mass').value) || 0.5;
                 spring_horizontal.amplitude = parseFloat(document.getElementById('amplitude').value) || 0.2;
+                spring_horizontal.damping = parseFloat(document.getElementById('damping').value) || 0.2;
                 spring_horizontal.t = 0;
             } else if (experiment === 'inclined_plane') {
                 inclined_plane.angle = parseFloat(document.getElementById('angle').value) || 30;
@@ -1129,7 +1145,9 @@
             else if (experiment === 'spring_horizontal') drawSpringHorizontal();
             else if (experiment === 'inclined_plane') drawInclinedPlane();
             showInfo();
-            updateChartData();
+            if (!isPaused) {
+                updateChartData();
+            }
             requestAnimationFrame(animate);
         }
 
@@ -1139,3 +1157,4 @@
     </script>
 </body>
 </html>
+Một số tính năng còn chưa hoàn thiện! Mình sẽ tiếp tục cập nhật trong thời gian tới.
