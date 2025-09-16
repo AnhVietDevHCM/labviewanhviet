@@ -262,7 +262,8 @@
             mass: 1, // kg
             g: 9.81,
             friction: 0.1, // Hệ số ma sát
-            s: 0, // Quãng đường đi được (m)
+            F_pull: 0, // Lực kéo (N)
+            s: 0, // Quãng đường đi được (m) - s > 0 là đi lên, s < 0 là đi xuống
             v: 0, t: 0 // Vận tốc (m/s), thời gian (s)
         };
 
@@ -627,11 +628,24 @@
         }
         function updateInclinedPlane() {
             const planeLengthM = (600 - 150) / 40 / Math.cos(inclined_plane.angle * Math.PI / 180);
-            let rad = inclined_plane.angle * Math.PI / 180;
-            if (inclined_plane.s < planeLengthM) {
-                let a_g = inclined_plane.g * Math.sin(rad);
-                let a_f = -inclined_plane.friction * inclined_plane.g * Math.cos(rad);
-                let a = (a_g + a_f > 0) ? a_g + a_f : 0; // Gia tốc không thể âm (vật không tự đi ngược)
+            const rad = inclined_plane.angle * Math.PI / 180;
+            const m = inclined_plane.mass;
+            const g = inclined_plane.g;
+            const mu = inclined_plane.friction;
+            const F_pull = inclined_plane.F_pull;
+
+            // Các lực tác động (chiếu lên phương song song với mặt phẳng nghiêng)
+            const F_gravity_parallel = m * g * Math.sin(rad); // Thành phần trọng lực kéo xuống
+            const F_friction_static_max = mu * m * g * Math.cos(rad); // Ma sát nghỉ cực đại
+            
+            // Lực ma sát động, luôn ngược chiều chuyển động
+            const F_friction_kinetic = Math.sign(inclined_plane.v) * F_friction_static_max;
+
+            const F_net = F_pull - F_gravity_parallel - F_friction_kinetic;
+            const a = F_net / m;
+
+            // Chỉ cập nhật chuyển động nếu vật chưa ra khỏi mặt phẳng
+            if (inclined_plane.s < planeLengthM && inclined_plane.s >= 0) {
                 inclined_plane.v += a * timeStep * speed;
                 inclined_plane.s += inclined_plane.v * timeStep * speed;
                 inclined_plane.t += timeStep * speed;
@@ -651,6 +665,10 @@
                 html = '\\( PV = nRT \\)';
             } else if (experiment === 'thermo') {
                 html = '\\( Q = m c \\Delta T \\)';
+            } else if (experiment === 'spring_horizontal') {
+                html = '\\( F_{net} = -kx - F_{cản} \\), &nbsp; \\( x(t) = A e^{-\\frac{\\gamma t}{2}} \\cos(\\omega t) \\)';
+            } else if (experiment === 'inclined_plane') {
+                html = '\\( a = g(\\sin\\alpha - \\mu_t \\cos\\alpha) \\)';
             }
             document.getElementById('formula').innerHTML = html;
             if (window.MathJax) MathJax.typesetPromise();
@@ -786,21 +804,25 @@
                 `;
             } else if (experiment === 'inclined_plane') {
                 let rad = inclined_plane.angle * Math.PI / 180;
-                let a = (inclined_plane.g * Math.sin(rad) - inclined_plane.friction * inclined_plane.g * Math.cos(rad));
-                if (a < 0) a = 0;
+                const F_net = inclined_plane.F_pull - inclined_plane.mass * inclined_plane.g * Math.sin(rad) - Math.sign(inclined_plane.v) * inclined_plane.friction * inclined_plane.mass * inclined_plane.g * Math.cos(rad);
+                let a = F_net / inclined_plane.mass;
+
                 let h = inclined_plane.s * Math.sin(rad); // Độ cao đã đi được (tính từ dưới lên)
                 let h_max = ((600 - 150) / 40) * Math.tan(rad);
                 let current_h = h_max - h;
                 let KE = 0.5 * inclined_plane.mass * inclined_plane.v * inclined_plane.v;
                 let PE = inclined_plane.mass * inclined_plane.g * current_h;
+                let F_g_parallel = inclined_plane.mass * inclined_plane.g * Math.sin(rad);
                 html = `
                     <b>Mặt phẳng nghiêng:</b><br>
-                    Thời gian: ${(inclined_plane.t).toFixed(2)} s<br>
+                    Thời gian: ${inclined_plane.t.toFixed(2)} s<br>
                     Góc nghiêng: ${inclined_plane.angle}°<br>
                     Khối lượng: ${inclined_plane.mass} kg<br>
                     Gia tốc: ${a.toFixed(2)} m/s²<br>
                     Vận tốc: ${inclined_plane.v.toFixed(2)} m/s<br>
                     Quãng đường: ${inclined_plane.s.toFixed(2)} m<br>
+                    Lực kéo: ${inclined_plane.F_pull.toFixed(2)} N<br>
+                    Thành phần &parallel; của trọng lực: ${F_g_parallel.toFixed(2)} N<br>
                     Động năng (KE): ${KE.toFixed(3)} J<br>
                     Thế năng (PE): ${PE.toFixed(3)} J<br>
                     Năng lượng (E): ${(KE+PE).toFixed(3)} J
@@ -859,6 +881,7 @@
                     <div class="param-item"><span class="slider-label">Góc nghiêng (°):</span><input type="range" id="angle" min="5" max="60" value="30" oninput="document.getElementById('angle_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="angle_val">30</span></div>
                     <div class="param-item"><span class="slider-label">Hệ số ma sát:</span><input type="range" id="friction" min="0" max="0.6" step="0.01" value="0.1" oninput="document.getElementById('friction_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="friction_val">0.1</span></div>
                     <div class="param-item"><span class="slider-label">Khối lượng (kg):</span><input type="range" id="mass" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('mass_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="mass_val">1</span></div>
+                    <div class="param-item"><span class="slider-label">Lực kéo (N):</span><input type="range" id="F_pull" min="0" max="50" step="0.1" value="0" oninput="document.getElementById('F_pull_val').innerText=this.value; resetExperiment()"><span class="slider-value" id="F_pull_val">0</span></div>
                 `;
             }
             document.getElementById('params').innerHTML = html;
@@ -913,9 +936,15 @@
                 inclined_plane.angle = parseFloat(document.getElementById('angle').value) || 30;
                 inclined_plane.mass = parseFloat(document.getElementById('mass').value) || 1;
                 inclined_plane.friction = parseFloat(document.getElementById('friction').value) || 0.1;
+                inclined_plane.F_pull = parseFloat(document.getElementById('F_pull').value) || 0;
                 inclined_plane.s = 0;
                 inclined_plane.v = 0;
                 inclined_plane.t = 0;
+                // Thêm dòng này để đặt lại vị trí vẽ của vật
+                const startX = 150, startY = 400;
+                let rad = inclined_plane.angle * Math.PI / 180;
+                inclined_plane.x = startX; // Đặt lại tọa độ x, y để vẽ
+                inclined_plane.y = startY; // (Mặc dù không dùng trực tiếp nhưng để cho đầy đủ)
             }
         }
 
