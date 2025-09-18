@@ -7,9 +7,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #1a1a2e, #2c2c3e);
+      --accent-color: #e67e22;
+      --accent-color-dark: #d35400;
+      --card-bg: rgba(47, 47, 61, 0.7);
+      --text-color: #f1f1f1;
+      --text-color-bright: #ffcc00;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --shadow-color: rgba(0,0,0,0.3);
+      --control-bg: #3b3b4d;
+      --slider-track: #555;
+    }
+
     body {
-      background: linear-gradient(135deg, #1a1a2e, #2c2c3e);
-      color: #f1f1f1;
+      background: var(--bg-gradient);
+      color: var(--text-color);
       font-family: 'Poppins', 'Segoe UI', sans-serif;
       margin: 0;
       padding: 0;
@@ -17,22 +30,39 @@
     }
     h2 {
       margin: 20px 0;
-      color: #ffcc00;
+      color: var(--text-color-bright);
       text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
       font-weight: 600;
     }
+    /* Aurora background effect */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: radial-gradient(circle at 10% 20%, hsla(210, 80%, 60%, 0.15), transparent 40%),
+                    radial-gradient(circle at 90% 80%, hsla(340, 80%, 60%, 0.15), transparent 40%);
+        z-index: -1;
+        transition: opacity 0.5s;
+    }
+    /* Theme classes */
+    body.theme-deep-space { --bg-gradient: linear-gradient(135deg, #1D2B64, #000000); }
+    body.theme-nebula { --bg-gradient: linear-gradient(135deg, #23074d, #cc5333); }
+    body.theme-sunset { --bg-gradient: linear-gradient(135deg, #0f2027, #203a43, #2c5364); }
+    body.theme-default { --bg-gradient: linear-gradient(135deg, #1a1a2e, #2c2c3e); }
+
     .container {
       margin: 20px auto;
       max-width: 900px;
-      background: rgba(47, 47, 61, 0.7);
+      background: var(--card-bg);
       border-radius: 16px;
       padding: 20px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 32px 0 var(--shadow-color);
       backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border-color);
     }
     canvas {
-      background: #333642;
+      background: #333642; /* A slightly different shade for contrast */
       border-radius: 12px;
       margin: 20px 0;
       box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
@@ -40,7 +70,7 @@
     .controls, #params {
       margin: 10px 0;
       padding: 15px;
-      background: #3b3b4d;
+      background: var(--control-bg);
       border-radius: 10px;
     }
     #params {
@@ -59,20 +89,20 @@
       padding: 5px;
       border-radius: 6px;
       border: none;
-      background: #555;
-      color: #fff;
+      background: var(--slider-track);
+      color: var(--text-color);
       font-family: 'Poppins', sans-serif;
     }
     button {
       margin: 5px;
       padding: 8px 18px;
       border-radius: 8px;
-      border: none;
-      background: #e67e22;
-      color: #fff;
+      border: 1px solid transparent;
+      background: var(--accent-color);
+      color: var(--text-color);
       font-weight: 600;
       font-family: 'Poppins', sans-serif;
-      cursor: pointer;
+      cursor: pointer; 
       transition: background-color 0.3s, transform 0.2s;
     }
     button:hover {
@@ -86,25 +116,40 @@
       -webkit-appearance: none;
       appearance: none;
       width: 150px;
-      height: 8px;
-      background: #555;
+      height: 6px;
+      background: var(--slider-track);
       border-radius: 5px;
       outline: none;
       margin: 0 10px;
+      background-image: linear-gradient(var(--accent-color), var(--accent-color));
+      background-size: 0% 100%;
+      background-repeat: no-repeat;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
       width: 20px;
       height: 20px;
-      background: #e67e22;
+      background: var(--accent-color);
       cursor: pointer;
       border-radius: 50%;
+      border: 2px solid var(--control-bg);
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      transition: background-color .2s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+        background-color: var(--accent-color-dark);
+    }
+    input[type="range"]::-moz-range-thumb { /* Firefox */
+        width: 18px; height: 18px; background: var(--accent-color); cursor: pointer; border-radius: 50%; border: none;
+    }
+    input[type="range"]::-moz-range-track { /* Firefox */
+        width: 100%; height: 6px; background: var(--slider-track); border-radius: 5px;
     }
     .formula {
       margin: 15px 0;
       font-size: 1.1em;
-      color: #ffd54f;
+      color: var(--text-color-bright);
     }
     #info {
       margin-top: 15px;
@@ -134,11 +179,44 @@
     .chart-container {
       flex-grow: 1; min-width: 200px; background: #3b3b4d; border-radius: 10px; padding: 10px; margin-top: 20px;
     }
+
+    /* Theme switcher */
+    .theme-switcher {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        display: flex;
+        gap: 8px;
+        background: rgba(0,0,0,0.2);
+        padding: 6px;
+        border-radius: 8px;
+    }
+    .theme-dot {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid rgba(255,255,255,0.3);
+        transition: transform 0.2s;
+    }
+    .theme-dot:hover {
+        transform: scale(1.1);
+    }
+    #theme-default { background: linear-gradient(45deg, #1a1a2e, #2c2c3e); }
+    #theme-deep-space { background: linear-gradient(45deg, #1D2B64, #000000); }
+    #theme-nebula { background: linear-gradient(45deg, #23074d, #cc5333); }
+    #theme-sunset { background: linear-gradient(45deg, #0f2027, #2c5364); }
   </style>
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
+  <div class="theme-switcher">
+    <div class="theme-dot" id="theme-default" onclick="changeTheme('theme-default')"></div>
+    <div class="theme-dot" id="theme-deep-space" onclick="changeTheme('theme-deep-space')"></div>
+    <div class="theme-dot" id="theme-nebula" onclick="changeTheme('theme-nebula')"></div>
+    <div class="theme-dot" id="theme-sunset" onclick="changeTheme('theme-sunset')"></div>
+  </div>
   <h2>Phòng Thí Nghiệm Vật Lí Ảo <br><span style="font-size:0.6em;">(Ver 1.0 - By Developer Anh Viet)</span></h2>
   <div class="container">
     <div class="controls">
@@ -635,14 +713,24 @@
             const F_pull = inclined_plane.F_pull;
 
             // Các lực tác động (chiếu lên phương song song với mặt phẳng nghiêng)
-            const F_gravity_parallel = m * g * Math.sin(rad); // Thành phần trọng lực kéo xuống
-            const F_friction_static_max = mu * m * g * Math.cos(rad); // Ma sát nghỉ cực đại
-            
-            // Lực ma sát động, luôn ngược chiều chuyển động
-            const F_friction_kinetic = Math.sign(inclined_plane.v) * F_friction_static_max;
+            const F_gravity_parallel = m * g * Math.sin(rad);
+            const F_friction_max = mu * m * g * Math.cos(rad);
+            let a = 0;
 
-            const F_net = F_pull - F_gravity_parallel - F_friction_kinetic;
-            const a = F_net / m;
+            if (inclined_plane.v === 0) {
+                // Vật đang đứng yên, kiểm tra điều kiện để bắt đầu chuyển động
+                const F_parallel_net = F_pull - F_gravity_parallel;
+                if (Math.abs(F_parallel_net) > F_friction_max) {
+                    // Thắng được ma sát nghỉ, bắt đầu chuyển động
+                    const F_friction_kinetic = Math.sign(F_parallel_net) * F_friction_max;
+                    const F_net = F_parallel_net - F_friction_kinetic;
+                    a = F_net / m;
+                }
+            } else {
+                // Vật đang chuyển động, ma sát trượt ngược chiều vận tốc
+                const F_friction_kinetic = Math.sign(inclined_plane.v) * F_friction_max;
+                a = (F_pull - F_gravity_parallel - F_friction_kinetic) / m;
+            }
 
             // Chỉ cập nhật chuyển động nếu vật chưa ra khỏi mặt phẳng
             if (inclined_plane.s < planeLengthM && inclined_plane.s >= 0) {
@@ -807,11 +895,9 @@
                 const F_net = inclined_plane.F_pull - inclined_plane.mass * inclined_plane.g * Math.sin(rad) - Math.sign(inclined_plane.v) * inclined_plane.friction * inclined_plane.mass * inclined_plane.g * Math.cos(rad);
                 let a = F_net / inclined_plane.mass;
 
-                let h = inclined_plane.s * Math.sin(rad); // Độ cao đã đi được (tính từ dưới lên)
-                let h_max = ((600 - 150) / 40) * Math.tan(rad);
-                let current_h = h_max - h;
-                let KE = 0.5 * inclined_plane.mass * inclined_plane.v * inclined_plane.v;
-                let PE = inclined_plane.mass * inclined_plane.g * current_h;
+                let h = inclined_plane.s * Math.sin(rad); // Độ cao hiện tại so với chân mặt phẳng nghiêng
+                let KE = 0.5 * inclined_plane.mass * Math.pow(inclined_plane.v, 2);
+                let PE = inclined_plane.mass * inclined_plane.g * h;
                 let F_g_parallel = inclined_plane.mass * inclined_plane.g * Math.sin(rad);
                 html = `
                     <b>Mặt phẳng nghiêng:</b><br>
@@ -977,11 +1063,69 @@
             if (thermo.heating) thermo.lastUpdate = Date.now();
         }
 
+        function changeTheme(themeClass) {
+            document.body.className = themeClass; // Gán class mới cho body
+            saveState(); // Lưu trạng thái sau khi đổi theme
+        }
+
+        // --- Cập nhật màu thanh trượt ---
+        function updateSliderFill(slider) {
+            const min = slider.min || 0;
+            const max = slider.max || 100;
+            const val = slider.value;
+            const percentage = ((val - min) / (max - min)) * 100;
+            slider.style.backgroundSize = `${percentage}% 100%`;
+        }
+
+        // --- Lưu và Tải Trạng thái ---
+        const STATE_KEY = 'virtualLabState';
+
+        function saveState() {
+            const paramsToSave = {};
+            document.querySelectorAll('#params input[type="range"]').forEach(slider => {
+                paramsToSave[slider.id] = slider.value;
+            });
+
+            const state = {
+                theme: document.body.className,
+                experiment: document.getElementById('experiment').value,
+                params: paramsToSave
+            };
+            localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        }
+
+        function loadState() {
+            const savedState = localStorage.getItem(STATE_KEY);
+            if (!savedState) {
+                changeExperiment(); // Nếu không có gì, chạy mặc định
+                return;
+            }
+            const state = JSON.parse(savedState);
+            document.body.className = state.theme || 'theme-default';
+            document.getElementById('experiment').value = state.experiment || 'pendulum';
+            changeExperiment(false); // Tải thí nghiệm nhưng không lưu lại ngay
+
+            // Áp dụng lại các giá trị slider đã lưu
+            if (state.params) {
+                for (const paramId in state.params) {
+                    const slider = document.getElementById(paramId);
+                    if (slider) {
+                        slider.value = state.params[paramId];
+                        const valueSpan = document.getElementById(paramId + '_val');
+                        if (valueSpan) valueSpan.innerText = slider.value;
+                        updateSliderFill(slider);
+                    }
+                }
+                resetExperiment(); // Áp dụng các giá trị vừa set vào mô phỏng
+            }
+        }
+
         // --- Chart Functions ---
         function initChart() {
             const chartCanvas = document.getElementById('energyChart').getContext('2d');
             energyChart = new Chart(chartCanvas, {
                 type: 'line',
+                // Giữ nguyên cấu trúc biểu đồ, chỉ thay đổi màu sắc
                 data: {
                     labels: chartData.labels,
                     datasets: [
@@ -992,14 +1136,14 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: false, 
                     animation: { duration: 0 },
-                    title: { display: true, text: 'Biểu đồ Năng lượng', fontColor: '#f1f1f1' },
+                    title: { display: true, text: 'Biểu đồ Năng lượng', fontColor: 'var(--text-color)' },
                     scales: {
-                        xAxes: [{ ticks: { fontColor: '#f1f1f1' }, gridLines: { color: 'rgba(255,255,255,0.1)' } }],
-                        yAxes: [{ ticks: { fontColor: '#f1f1f1' }, gridLines: { color: 'rgba(255,255,255,0.1)' }, scaleLabel: { display: true, labelString: 'Năng lượng (J)', fontColor: '#f1f1f1' } }]
+                        xAxes: [{ ticks: { fontColor: 'var(--text-color)' }, gridLines: { color: 'var(--border-color)' } }],
+                        yAxes: [{ ticks: { fontColor: 'var(--text-color)' }, gridLines: { color: 'var(--border-color)' }, scaleLabel: { display: true, labelString: 'Năng lượng (J)', fontColor: 'var(--text-color)' } }]
                     },
-                    legend: { labels: { fontColor: '#f1f1f1' } }
+                    legend: { labels: { fontColor: 'var(--text-color)' } }
                 }
             });
         }
@@ -1116,12 +1260,12 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
-                    title: { display: true, text: 'Phân bố vận tốc phân tử', fontColor: '#f1f1f1' },
+                    title: { display: true, text: 'Phân bố vận tốc phân tử', fontColor: 'var(--text-color)' },
                     scales: {
-                        xAxes: [{ scaleLabel: { display: true, labelString: 'Vận tốc (m/s)', fontColor: '#f1f1f1' }, ticks: { fontColor: '#f1f1f1' }, gridLines: { color: 'rgba(255,255,255,0.1)' } }],
-                        yAxes: [{ scaleLabel: { display: true, labelString: 'Xác suất', fontColor: '#f1f1f1' }, ticks: { fontColor: '#f1f1f1', beginAtZero: true }, gridLines: { color: 'rgba(255,255,255,0.1)' } }]
+                        xAxes: [{ scaleLabel: { display: true, labelString: 'Vận tốc (m/s)', fontColor: 'var(--text-color)' }, ticks: { fontColor: 'var(--text-color)' }, gridLines: { color: 'var(--border-color)' } }],
+                        yAxes: [{ scaleLabel: { display: true, labelString: 'Xác suất', fontColor: 'var(--text-color)' }, ticks: { fontColor: 'var(--text-color)', beginAtZero: true }, gridLines: { color: 'var(--border-color)' } }]
                     },
-                    legend: { labels: { fontColor: '#f1f1f1' } }
+                    legend: { labels: { fontColor: 'var(--text-color)' } }
                 }
             });
         }
@@ -1143,12 +1287,12 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
-                    title: { display: true, text: 'Biểu đồ Nhiệt độ', fontColor: '#f1f1f1' },
+                    title: { display: true, text: 'Biểu đồ Nhiệt độ', fontColor: 'var(--text-color)' },
                     scales: {
-                        xAxes: [{ scaleLabel: { display: true, labelString: 'Thời gian (s)', fontColor: '#f1f1f1' }, ticks: { fontColor: '#f1f1f1' }, gridLines: { color: 'rgba(255,255,255,0.1)' } }],
-                        yAxes: [{ scaleLabel: { display: true, labelString: 'Nhiệt độ (°C)', fontColor: '#f1f1f1' }, ticks: { fontColor: '#f1f1f1' }, gridLines: { color: 'rgba(255,255,255,0.1)' } }]
+                        xAxes: [{ scaleLabel: { display: true, labelString: 'Thời gian (s)', fontColor: 'var(--text-color)' }, ticks: { fontColor: 'var(--text-color)' }, gridLines: { color: 'var(--border-color)' } }],
+                        yAxes: [{ scaleLabel: { display: true, labelString: 'Nhiệt độ (°C)', fontColor: 'var(--text-color)' }, ticks: { fontColor: 'var(--text-color)' }, gridLines: { color: 'var(--border-color)' } }]
                     },
-                    legend: { labels: { fontColor: '#f1f1f1' } }
+                    legend: { labels: { fontColor: 'var(--text-color)' } }
                 }
             });
         }
@@ -1181,8 +1325,15 @@
         }
 
         // --- Khởi chạy ---
-        changeExperiment(); // Hàm này giờ đã bao gồm cả việc setup biểu đồ
+        loadState(); // Thay vì chạy mặc định, hãy tải trạng thái đã lưu
         animate();
+        // Thêm event listener để cập nhật màu thanh trượt khi người dùng tương tác
+        document.getElementById('params').addEventListener('input', function(e) {
+            if (e.target.type === 'range') {
+                updateSliderFill(e.target);
+                saveState(); // Lưu trạng thái mỗi khi slider thay đổi
+            }
+        });
     </script>
 </body>
 </html>
